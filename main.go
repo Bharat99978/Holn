@@ -9,13 +9,14 @@ import (
 	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func handler(w http.ResponseWriter, r *http.Request) {
+// Handler is the exported function that Vercel will call for each HTTP request.
+func Handler(w http.ResponseWriter, r *http.Request) error {
 	// Initialize bot with token from environment variable
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_APITOKEN"))
 	if err != nil {
 		log.Printf("Failed to initialize bot: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	// Parse incoming Telegram update
@@ -23,13 +24,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
 		log.Printf("Error decoding update: %v", err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
+		return err
 	}
 
 	// Ignore non-message updates or non-command messages
 	if update.Message == nil || !update.Message.IsCommand() {
 		w.WriteHeader(http.StatusOK)
-		return
+		return nil
 	}
 
 	// Prepare response message
@@ -53,25 +54,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if _, err := bot.Send(msg); err != nil {
 		log.Printf("Error sending message: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	// Acknowledge receipt
 	w.WriteHeader(http.StatusOK)
-}
-
-func main() {
-	// Handle requests at /bot endpoint
-	http.HandleFunc("/bot", handler)
-
-	// Use PORT from environment (Vercel sets this)
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080" // Fallback for local testing
-	}
-
-	log.Printf("Starting server on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal("Failed to start server: ", err)
-	}
+	return nil
 }
